@@ -1,0 +1,20 @@
+node_modules
+dist
+coverage
+
+# Claude Code internal instructions — not relevant to contributors
+CLAUDE.md
+
+# Environment — never commit secrets
+.env
+.env.*
+!.env.example
+
+# Generated Prisma client
+/src/generated/prisma
+
+# TLS certificates — never commit private keys
+nginx/certs/*.pem
+nginx/certs/*.crt
+nginx/certs/*.key
+!nginx/certs/.gitkeep

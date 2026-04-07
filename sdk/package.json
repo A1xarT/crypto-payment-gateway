@@ -1,0 +1,16 @@
+{
+  "name": "@crypto-gateway/sdk",
+  "version": "1.0.0",
+  "description": "TypeScript SDK for the Crypto Payment Gateway API",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch"
+  },
+  "keywords": ["crypto", "ethereum", "payments", "gateway"],
+  "license": "MIT",
+  "devDependencies": {
+    "typescript": "^5.7.3"
+  }
+}

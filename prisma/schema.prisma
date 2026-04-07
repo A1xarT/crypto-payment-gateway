@@ -1,0 +1,193 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model User {
+  id            String    @id @default(uuid())
+  email         String    @unique
+  passwordHash  String    @map("password_hash")
+  payoutAddress String?   @map("payout_address")
+  isAdmin       Boolean   @default(false) @map("is_admin")
+  createdAt     DateTime  @default(now()) @map("created_at")
+  payments          Payment[]
+  webhooks          Webhook[]
+  apiKeys           ApiKey[]
+  checkoutSessions  CheckoutSession[]
+
+  @@map("users")
+}
+
+model ApiKey {
+  id         String    @id @default(uuid())
+  userId     String    @map("user_id")
+  name       String
+  keyHash    String    @unique @map("key_hash")
+  keyPrefix  String    @map("key_prefix")
+  type       KeyType
+  isActive   Boolean   @default(true) @map("is_active")
+  lastUsedAt DateTime? @map("last_used_at")
+  createdAt  DateTime  @default(now()) @map("created_at")
+  user       User      @relation(fields: [userId], references: [id])
+
+  @@map("api_keys")
+}
+
+enum KeyType {
+  SECRET
+  PUBLISHABLE
+}
+
+model Payment {
+  id              String          @id @default(uuid())
+  userId          String          @map("user_id")
+  amount          Decimal         @db.Decimal(20, 8)
+  currency        String
+  status          PaymentStatus   @default(PENDING)
+  network         Network         @default(MAINNET)
+  reference       String?
+  metadata        Json?
+  receivedAmount  Decimal?        @db.Decimal(30, 0) @map("received_amount") // in Wei
+  expiresAt       DateTime?       @map("expires_at")
+  createdAt       DateTime        @default(now()) @map("created_at")
+  user            User            @relation(fields: [userId], references: [id])
+  address         PaymentAddress?
+  sweep           Sweep?
+
+  @@index([userId, reference])
+  @@map("payments")
+}
+
+enum Network {
+  MAINNET
+  TESTNET
+}
+
+model PaymentAddress {
+  id                  String  @id @default(uuid())
+  paymentId           String  @unique @map("payment_id")
+  address             String  @unique
+  privateKeyEncrypted String  @map("private_key_encrypted")
+  payment             Payment @relation(fields: [paymentId], references: [id])
+
+  @@map("addresses")
+}
+
+enum PaymentStatus {
+  PENDING
+  UNDERPAID
+  CONFIRMED
+  FAILED
+  EXPIRED
+}
+
+model Webhook {
+  id        String            @id @default(uuid())
+  userId    String            @map("user_id")
+  url       String
+  secret    String
+  isActive  Boolean           @default(true) @map("is_active")
+  createdAt DateTime          @default(now()) @map("created_at")
+  user      User              @relation(fields: [userId], references: [id])
+  deliveries WebhookDelivery[]
+
+  @@map("webhooks")
+}
+
+model WebhookDelivery {
+  id           String         @id @default(uuid())
+  webhookId    String         @map("webhook_id")
+  paymentId    String         @map("payment_id")
+  payload      Json
+  status       DeliveryStatus @default(PENDING)
+  responseCode Int?           @map("response_code")
+  responseBody String?        @map("response_body")
+  attemptCount Int            @default(0) @map("attempt_count")
+  nextRetryAt  DateTime?      @map("next_retry_at")
+  createdAt    DateTime       @default(now()) @map("created_at")
+  webhook      Webhook        @relation(fields: [webhookId], references: [id])
+
+  @@map("webhook_deliveries")
+}
+
+enum DeliveryStatus {
+  PENDING
+  DELIVERED
+  FAILED
+}
+
+model Sweep {
+  id           String      @id @default(uuid())
+  paymentId    String      @unique @map("payment_id")
+  toAddress    String      @map("to_address")
+  txHash       String?     @map("tx_hash")
+  amountWei    String      @map("amount_wei")
+  gasCostWei   String      @map("gas_cost_wei")
+  status       SweepStatus @default(PENDING)
+  errorMessage String?     @map("error_message")
+  attemptCount Int         @default(0) @map("attempt_count")
+  confirmedAt  DateTime?   @map("confirmed_at")
+  createdAt    DateTime    @default(now()) @map("created_at")
+  payment      Payment     @relation(fields: [paymentId], references: [id])
+
+  @@map("sweeps")
+}
+
+enum SweepStatus {
+  PENDING
+  BROADCAST
+  CONFIRMED
+  FAILED
+}
+
+model CheckoutSession {
+  id          String                @id @default(uuid())
+  userId      String                @map("user_id")
+  paymentId   String?               @unique @map("payment_id")
+  amount      Decimal               @db.Decimal(20, 8)
+  currency    String
+  successUrl  String                @map("success_url")
+  cancelUrl   String                @map("cancel_url")
+  status      CheckoutSessionStatus @default(OPEN)
+  expiresAt   DateTime              @map("expires_at")
+  createdAt   DateTime              @default(now()) @map("created_at")
+  user        User                  @relation(fields: [userId], references: [id])
+
+  @@map("checkout_sessions")
+}
+
+enum CheckoutSessionStatus {
+  OPEN
+  PAID
+  EXPIRED
+  CANCELLED
+}
+
+// Stores revoked JWTs until their natural expiry time.
+// The cleanup job removes entries where expiresAt has passed.
+model RevokedToken {
+  id        String   @id @default(uuid())
+  jti       String   @unique // JWT ID claim — index for fast lookup
+  userId    String   @map("user_id")
+  expiresAt DateTime @map("expires_at")
+  revokedAt DateTime @default(now()) @map("revoked_at")
+
+  @@index([expiresAt])
+  @@map("revoked_tokens")
+}
+
+model IdempotencyRecord {
+  id             String   @id @default(uuid())
+  idempotencyKey String   @unique @map("idempotency_key")
+  userId         String   @map("user_id")
+  requestPath    String   @map("request_path")
+  responseStatus Int      @map("response_status")
+  responseBody   Json     @map("response_body")
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  @@map("idempotency_records")
+}
