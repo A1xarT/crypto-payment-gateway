@@ -7,7 +7,7 @@ const options: swaggerJsdoc.Options = {
     info: {
       title: 'Crypto Payment Gateway API',
       version: '1.0.0',
-      description: 'A REST API for exploring Ethereum blockchain data and processing crypto payments.',
+      description: 'Self-hosted Ethereum payment gateway. Accept crypto payments via dedicated deposit addresses, HMAC-signed webhooks, and a hosted checkout page.',
     },
     security: [{ bearerAuth: [] }],
     servers: [
