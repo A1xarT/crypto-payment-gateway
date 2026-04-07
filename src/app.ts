@@ -158,6 +158,52 @@ app.get('/metrics', async (request, response) => {
 
 // ── Health check ────────────────────────────────────────────────────────────
 
+/**
+ * @openapi
+ * /health:
+ *   get:
+ *     tags: [Health]
+ *     summary: API health check
+ *     description: >
+ *       Returns the operational status of the API, database, and Ethereum RPC.
+ *       A 200 response means the database is reachable. RPC failure downgrades
+ *       to `degraded` but does not return 503.
+ *     responses:
+ *       200:
+ *         description: All systems operational
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     status:
+ *                       type: string
+ *                       enum: [ok, degraded]
+ *                       example: ok
+ *                     checks:
+ *                       type: object
+ *                       properties:
+ *                         api:
+ *                           type: string
+ *                           enum: [ok]
+ *                         database:
+ *                           type: string
+ *                           enum: [ok, down]
+ *                         rpc:
+ *                           type: string
+ *                           enum: [ok, degraded]
+ *                     timestamp:
+ *                       type: string
+ *                       format: date-time
+ *       503:
+ *         description: Database is unreachable
+ */
 app.get('/health', async (_req, res) => {
   const checks: Record<string, 'ok' | 'degraded' | 'down'> = {
     api: 'ok',
