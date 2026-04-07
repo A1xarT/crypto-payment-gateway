@@ -11,9 +11,12 @@ Built with Node.js, TypeScript, Express, PostgreSQL (Prisma), and Docker.
 ## Features
 
 ### Payments
+> **Note:** Only native ETH is supported. ERC-20 tokens (USDC, USDT, etc.) and other networks (Polygon, Cronos, etc.) are not supported.
+
 - Create payments with an ETH amount or a **fiat amount** (USD → ETH auto-converted via live exchange rate)
 - Each payment gets a dedicated Ethereum deposit address — HD wallet, private key stored AES-256 encrypted at rest
-- Background blockchain monitor transitions `PENDING → CONFIRMED` automatically when funds arrive
+- Background blockchain monitor transitions `PENDING → CONFIRMED` automatically when funds arrive, then sweeps to your payout address
+- Setting a payout address for the first time automatically sweeps any previously confirmed but unswept payments
 - Handles underpayment and expiry events
 - Public status polling endpoint (`GET /payments/:id/status`) — safe to call from a browser with no credentials
 - Idempotency keys on create prevent duplicate payments on network retry
@@ -163,6 +166,8 @@ Authorization: Bearer <jwt>         # JWT from POST /api/v1/auth/login
 | `GET` | `/api/v1/webhooks/:id/deliveries` | sk | Delivery history |
 | `POST` | `/api/v1/checkout/sessions` | sk | Create checkout session |
 | `POST` | `/api/v1/auth/login` | — | Get JWT |
+| `GET` | `/api/v1/account` | sk or jwt | Get account details |
+| `PATCH` | `/api/v1/account/payout-address` | sk or jwt | Set payout wallet address |
 | `GET` | `/api-docs` | — | Swagger UI |
 
 ### Create a payment (ETH amount)
