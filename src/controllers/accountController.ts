@@ -1,6 +1,8 @@
 import { Request, Response } from 'express';
 import { ethers } from 'ethers';
 import { prisma } from '../lib/prisma';
+import { sweepPayment } from '../services/sweepService';
+import { logger } from '../lib/logger';
 import { ApiResponse } from '../types';
 
 export interface AccountResult {
@@ -64,5 +66,27 @@ export const accountController = {
 
     const apiResponse: ApiResponse<AccountResult> = { success: true, data: result };
     response.status(200).json(apiResponse);
+
+    // Sweep any confirmed payments that were skipped because no payout address was set
+    const stranded = await prisma.payment.findMany({
+      where: {
+        userId,
+        status: 'CONFIRMED',
+        OR: [
+          { sweep: { is: null } },
+          { sweep: { is: { status: 'FAILED' } } },
+        ],
+      },
+      select: { id: true },
+    });
+
+    if (stranded.length > 0) {
+      logger.info({ userId, count: stranded.length }, '[AccountController] Triggering backfill sweeps for stranded payments');
+      for (const payment of stranded) {
+        sweepPayment(payment.id).catch((error) => {
+          logger.error({ err: error, paymentId: payment.id }, '[AccountController] Backfill sweep failed');
+        });
+      }
+    }
   },
 };
