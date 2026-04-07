@@ -1,7 +1,7 @@
 {
-  "name": "blockchain-explorer-api",
+  "name": "crypto-payment-gateway",
   "version": "1.0.0",
-  "description": "A REST API for exploring blockchain data",
+  "description": "Self-hosted Ethereum payment processor API",
   "main": "dist/app.js",
   "scripts": {
     "build": "tsc",
@@ -16,8 +16,10 @@
     "test:rpc": "ts-node scripts/test-rpc.ts"
   },
   "keywords": [
-    "blockchain",
-    "explorer",
+    "ethereum",
+    "payments",
+    "crypto",
+    "gateway",
     "api",
     "express",
     "typescript"
