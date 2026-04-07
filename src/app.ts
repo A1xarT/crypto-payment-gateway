@@ -2,7 +2,6 @@ import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
 import swaggerUi from 'swagger-ui-express';
-import { ethers } from 'ethers';
 import { config } from './config';
 import { swaggerSpec } from './config/swagger';
 import { logger } from './lib/logger';
@@ -12,6 +11,7 @@ import { rateLimiter } from './middleware/rateLimiter';
 import { apiKeyRateLimiter } from './middleware/apiKeyRateLimiter';
 import { requestId } from './middleware/requestId';
 import { httpLogger } from './middleware/httpLogger';
+import healthRoutes from './routes/healthRoutes';
 import blockRoutes from './routes/blockRoutes';
 import transactionRoutes from './routes/transactionRoutes';
 import addressRoutes from './routes/addressRoutes';
@@ -157,89 +157,7 @@ app.get('/metrics', async (request, response) => {
 });
 
 // ── Health check ────────────────────────────────────────────────────────────
-
-/**
- * @openapi
- * /health:
- *   get:
- *     tags: [Health]
- *     summary: API health check
- *     description: >
- *       Returns the operational status of the API, database, and Ethereum RPC.
- *       A 200 response means the database is reachable. RPC failure downgrades
- *       to `degraded` but does not return 503.
- *     responses:
- *       200:
- *         description: All systems operational
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 success:
- *                   type: boolean
- *                   example: true
- *                 data:
- *                   type: object
- *                   properties:
- *                     status:
- *                       type: string
- *                       enum: [ok, degraded]
- *                       example: ok
- *                     checks:
- *                       type: object
- *                       properties:
- *                         api:
- *                           type: string
- *                           enum: [ok]
- *                         database:
- *                           type: string
- *                           enum: [ok, down]
- *                         rpc:
- *                           type: string
- *                           enum: [ok, degraded]
- *                     timestamp:
- *                       type: string
- *                       format: date-time
- *       503:
- *         description: Database is unreachable
- */
-app.get('/health', async (_req, res) => {
-  const checks: Record<string, 'ok' | 'degraded' | 'down'> = {
-    api: 'ok',
-    database: 'down',
-    rpc: 'degraded',
-  };
-
-  // Database ping
-  try {
-    await prisma.$queryRaw`SELECT 1`;
-    checks.database = 'ok';
-  } catch {
-    checks.database = 'down';
-  }
-
-  // RPC ping — failure is degraded, not down (service still accepts payments)
-  try {
-    const provider = new ethers.JsonRpcProvider(config.blockchain.rpcUrl);
-    await provider.getBlockNumber();
-    checks.rpc = 'ok';
-  } catch {
-    checks.rpc = 'degraded';
-  }
-
-  const overallOk = checks.database === 'ok';
-  const statusCode = overallOk ? 200 : 503;
-
-  res.status(statusCode).json({
-    success: overallOk,
-    data: {
-      status: overallOk ? 'ok' : 'degraded',
-      checks,
-      timestamp: new Date().toISOString(),
-    },
-  });
-});
+app.use('/health', healthRoutes);
 
 // ── Routes ──────────────────────────────────────────────────────────────────
 
