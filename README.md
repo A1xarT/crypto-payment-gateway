@@ -4,6 +4,8 @@ A self-hosted Ethereum payment processor API. Merchants integrate it to accept E
 
 Built with Node.js, TypeScript, Express, PostgreSQL (Prisma), and Docker.
 
+**Live demo:** [https://crypto-payment-gateway-ns8b.onrender.com/docs](https://crypto-payment-gateway-ns8b.onrender.com/docs)
+
 ---
 
 ## Features
@@ -108,7 +110,7 @@ docker compose exec api npm run create-admin
 
 ### 4. Explore the API
 
-Swagger UI is available at `http://localhost:3000/api-docs`.
+Swagger UI is available at `http://localhost:3000/api-docs`, or try the [live demo](https://crypto-payment-gateway-ns8b.onrender.com/docs).
 
 ---
 
