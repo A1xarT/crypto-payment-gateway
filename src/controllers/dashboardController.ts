@@ -286,6 +286,7 @@ const DASHBOARD_HTML = `<!DOCTYPE html>
     <div class="nav-item" onclick="switchTab('apikeys')" id="nav-apikeys">🔑 API Keys</div>
     <div class="nav-item" onclick="switchTab('analytics')" id="nav-analytics">📊 Analytics</div>
     <div class="nav-item" onclick="switchTab('account')" id="nav-account">⚙ Account</div>
+    <div class="nav-item" onclick="switchTab('admin')" id="nav-admin" style="display:none">🛡 Admin</div>
     <div class="sidebar-bottom">
       <div class="user-email" id="user-email-display"></div>
       <button class="btn-logout" onclick="logout()">Sign out</button>
@@ -477,6 +478,63 @@ const DASHBOARD_HTML = `<!DOCTYPE html>
       </div>
     </div>
 
+    <!-- ADMIN TAB -->
+    <div class="tab-content" id="tab-admin">
+      <h1 class="page-title">Admin</h1>
+
+      <div class="section-tabs">
+        <div class="section-tab active" onclick="switchAdminTab('users')" id="atab-users">Users</div>
+        <div class="section-tab" onclick="switchAdminTab('payments')" id="atab-payments">All Payments</div>
+        <div class="section-tab" onclick="switchAdminTab('sweeps')" id="atab-sweeps">Failed Sweeps</div>
+      </div>
+
+      <div class="tab-content active" id="admin-tab-users">
+        <div class="card">
+          <table>
+            <thead><tr><th>Email</th><th>Payout Address</th><th>Role</th><th>Joined</th></tr></thead>
+            <tbody id="admin-users-tbody"><tr><td colspan="4" class="empty">Loading…</td></tr></tbody>
+          </table>
+          <div class="pagination">
+            <button class="btn btn-ghost" id="admin-users-prev" onclick="loadAdminUsers(currentAdminUsersPage - 1)">← Prev</button>
+            <span id="admin-users-page-info"></span>
+            <button class="btn btn-ghost" id="admin-users-next" onclick="loadAdminUsers(currentAdminUsersPage + 1)">Next →</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="tab-content" id="admin-tab-payments">
+        <div style="display:flex;gap:10px;margin-bottom:16px">
+          <select id="admin-filter-status" onchange="loadAdminPayments(1)" style="width:160px;margin:0">
+            <option value="">All statuses</option>
+            <option value="PENDING">Pending</option>
+            <option value="CONFIRMED">Confirmed</option>
+            <option value="EXPIRED">Expired</option>
+            <option value="FAILED">Failed</option>
+          </select>
+        </div>
+        <div class="card">
+          <table>
+            <thead><tr><th>Merchant</th><th>Amount</th><th>Status</th><th>Network</th><th>Created</th></tr></thead>
+            <tbody id="admin-payments-tbody"><tr><td colspan="5" class="empty">Loading…</td></tr></tbody>
+          </table>
+          <div class="pagination">
+            <button class="btn btn-ghost" id="admin-payments-prev" onclick="loadAdminPayments(currentAdminPaymentsPage - 1)">← Prev</button>
+            <span id="admin-payments-page-info"></span>
+            <button class="btn btn-ghost" id="admin-payments-next" onclick="loadAdminPayments(currentAdminPaymentsPage + 1)">Next →</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="tab-content" id="admin-tab-sweeps">
+        <div class="card">
+          <table>
+            <thead><tr><th>Merchant</th><th>Payment</th><th>Amount</th><th>Network</th><th>Error</th><th>Date</th></tr></thead>
+            <tbody id="admin-sweeps-tbody"><tr><td colspan="6" class="empty">Loading…</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
   </main>
 </div>
 
@@ -590,6 +648,10 @@ const DASHBOARD_HTML = `<!DOCTYPE html>
   async function showDashboard() {
     document.getElementById('login-screen').style.display = 'none';
     document.getElementById('dashboard-shell').style.display = 'flex';
+    try {
+      const payload = JSON.parse(atob(token.split('.')[1]));
+      if (payload.isAdmin) document.getElementById('nav-admin').style.display = 'flex';
+    } catch {}
     await Promise.all([loadAccount(), loadPayments(1)]);
   }
 
@@ -617,6 +679,7 @@ const DASHBOARD_HTML = `<!DOCTYPE html>
     if (tab === 'apikeys')   loadApiKeys();
     if (tab === 'account')   loadAccount();
     if (tab === 'analytics') loadAnalytics();
+    if (tab === 'admin')     { switchAdminTab('users'); }
   }
 
   // ── Analytics ─────────────────────────────────────────────────────────────
@@ -926,6 +989,105 @@ const DASHBOARD_HTML = `<!DOCTYPE html>
 
     successEl.style.display = 'inline';
     setTimeout(() => { successEl.style.display = 'none'; }, 3000);
+  }
+
+  // ── Admin ─────────────────────────────────────────────────────────────────
+
+  let currentAdminUsersPage = 1;
+  let currentAdminPaymentsPage = 1;
+
+  function switchAdminTab(tab) {
+    document.querySelectorAll('#tab-admin .tab-content').forEach(el => el.classList.remove('active'));
+    document.querySelectorAll('[id^="atab-"]').forEach(el => el.classList.remove('active'));
+    document.getElementById('admin-tab-' + tab).classList.add('active');
+    document.getElementById('atab-' + tab).classList.add('active');
+    if (tab === 'users')    loadAdminUsers(1);
+    if (tab === 'payments') loadAdminPayments(1);
+    if (tab === 'sweeps')   loadAdminFailedSweeps();
+  }
+
+  async function loadAdminUsers(page) {
+    currentAdminUsersPage = page;
+    const body  = await api('/admin/users?page=' + page + '&limit=20');
+    const tbody = document.getElementById('admin-users-tbody');
+
+    if (!body.success || !body.data.length) {
+      tbody.innerHTML = '<tr><td colspan="4" class="empty">No users found</td></tr>';
+      document.getElementById('admin-users-page-info').textContent = '';
+      document.getElementById('admin-users-prev').disabled = true;
+      document.getElementById('admin-users-next').disabled = true;
+      return;
+    }
+
+    tbody.innerHTML = body.data.map(u => \`
+      <tr>
+        <td>\${u.email}</td>
+        <td class="mono" style="font-size:11px">\${u.payoutAddress ?? '<span style="color:#555">not set</span>'}</td>
+        <td>\${u.isAdmin ? '<span class="badge badge-secret">Admin</span>' : '<span class="badge badge-inactive">Merchant</span>'}</td>
+        <td>\${fmt(u.createdAt)}</td>
+      </tr>
+    \`).join('');
+
+    const total      = body.pagination?.total ?? body.data.length;
+    const totalPages = Math.ceil(total / (body.pagination?.limit ?? 20));
+    document.getElementById('admin-users-page-info').textContent = 'Page ' + page + ' of ' + totalPages + ' (' + total + ' total)';
+    document.getElementById('admin-users-prev').disabled = page <= 1;
+    document.getElementById('admin-users-next').disabled = page >= totalPages;
+  }
+
+  async function loadAdminPayments(page) {
+    currentAdminPaymentsPage = page;
+    const status = document.getElementById('admin-filter-status')?.value || '';
+    let url = '/admin/payments?page=' + page + '&limit=20';
+    if (status) url += '&status=' + status;
+
+    const body  = await api(url);
+    const tbody = document.getElementById('admin-payments-tbody');
+
+    if (!body.success || !body.data.length) {
+      tbody.innerHTML = '<tr><td colspan="5" class="empty">No payments found</td></tr>';
+      document.getElementById('admin-payments-page-info').textContent = '';
+      document.getElementById('admin-payments-prev').disabled = true;
+      document.getElementById('admin-payments-next').disabled = true;
+      return;
+    }
+
+    tbody.innerHTML = body.data.map(p => \`
+      <tr>
+        <td style="font-size:12px">\${p.merchantEmail}</td>
+        <td>\${p.amount} ETH</td>
+        <td><span class="badge badge-\${p.status.toLowerCase()}">\${p.status}</span></td>
+        <td><span class="badge badge-\${p.network.toLowerCase()}">\${p.network}</span></td>
+        <td>\${fmt(p.createdAt)}</td>
+      </tr>
+    \`).join('');
+
+    const total      = body.pagination?.total ?? body.data.length;
+    const totalPages = Math.ceil(total / (body.pagination?.limit ?? 20));
+    document.getElementById('admin-payments-page-info').textContent = 'Page ' + page + ' of ' + totalPages + ' (' + total + ' total)';
+    document.getElementById('admin-payments-prev').disabled = page <= 1;
+    document.getElementById('admin-payments-next').disabled = page >= totalPages;
+  }
+
+  async function loadAdminFailedSweeps() {
+    const body  = await api('/admin/sweeps/failed');
+    const tbody = document.getElementById('admin-sweeps-tbody');
+
+    if (!body.success || !body.data.length) {
+      tbody.innerHTML = '<tr><td colspan="6" class="empty">No failed sweeps</td></tr>';
+      return;
+    }
+
+    tbody.innerHTML = body.data.map(s => \`
+      <tr>
+        <td style="font-size:12px">\${s.merchantEmail}</td>
+        <td class="mono" style="font-size:11px" title="\${s.paymentId}">\${s.paymentId.slice(0, 8)}…</td>
+        <td>\${s.amount} ETH</td>
+        <td><span class="badge badge-\${s.network.toLowerCase()}">\${s.network}</span></td>
+        <td style="color:#fca5a5;font-size:12px;max-width:260px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="\${s.errorMessage ?? ''}">\${s.errorMessage ?? '—'}</td>
+        <td>\${fmt(s.createdAt)}</td>
+      </tr>
+    \`).join('');
   }
 
   // ── Modal helpers ─────────────────────────────────────────────────────────
