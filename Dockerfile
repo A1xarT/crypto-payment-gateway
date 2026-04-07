@@ -36,4 +36,4 @@ COPY prisma.config.ts ./
 EXPOSE 3000
 
 # Run migrations then start the server
-CMD ["sh", "-c", "npx prisma migrate deploy && node dist/app.js"]
+CMD ["sh", "-c", "until npx prisma migrate deploy; do echo 'Migration failed, retrying in 5s...'; sleep 5; done && node dist/app.js"]
