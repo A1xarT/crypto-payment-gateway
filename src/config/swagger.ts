@@ -11,6 +11,9 @@ const options: swaggerJsdoc.Options = {
     },
     security: [{ bearerAuth: [] }],
     servers: [
+      ...(process.env.BASE_URL
+        ? [{ url: process.env.BASE_URL, description: 'Production server' }]
+        : []),
       {
         url: `http://localhost:${config.port}`,
         description: 'Local development server',
