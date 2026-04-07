@@ -42,6 +42,11 @@ Built with Node.js, TypeScript, Express, PostgreSQL (Prisma), and Docker.
 - Block, transaction, and address lookup
 - Network stats (latest block, gas price, peer count)
 
+### Merchant Dashboard
+- Web UI at `/dashboard` — no separate frontend needed
+- Manage payments, webhooks, API keys, analytics, and payout address from the browser
+- **Admin panel** (admin accounts only) — view all merchants, all payments across the platform, and failed sweeps
+
 ### Observability & Security
 - Prometheus metrics at `GET /metrics` (firewalled by nginx in production)
 - Pino structured JSON logging with request IDs
@@ -114,6 +119,8 @@ docker compose exec api npm run create-admin
 ### 4. Explore the API
 
 Swagger UI is available at `http://localhost:3000/api-docs`, or try the [live demo](https://crypto-payment-gateway-ns8b.onrender.com/docs).
+
+The merchant dashboard is at `http://localhost:3000/dashboard`.
 
 ---
 

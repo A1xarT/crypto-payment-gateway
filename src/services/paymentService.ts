@@ -31,6 +31,7 @@ export interface PaymentResult {
   metadata: unknown;
   receivedAmount: string | null; // in Wei, null if nothing received yet
   expiresAt: string | null;
+  createdAt: string;
 }
 
 export interface ListPaymentsResult {
@@ -79,6 +80,7 @@ export const paymentService = {
           metadata: p.metadata ?? null,
           receivedAmount: p.receivedAmount?.toString() ?? null,
           expiresAt: p.expiresAt?.toISOString() ?? null,
+          createdAt: p.createdAt.toISOString(),
         })),
       total,
       page,
@@ -105,6 +107,7 @@ export const paymentService = {
       metadata: payment.metadata ?? null,
       receivedAmount: payment.receivedAmount?.toString() ?? null,
       expiresAt: payment.expiresAt?.toISOString() ?? null,
+      createdAt: payment.createdAt.toISOString(),
     };
   },
 
@@ -153,6 +156,7 @@ export const paymentService = {
       metadata: payment.metadata ?? null,
       receivedAmount: null,
       expiresAt: payment.expiresAt?.toISOString() ?? null,
+      createdAt: payment.createdAt.toISOString(),
     };
   },
 };

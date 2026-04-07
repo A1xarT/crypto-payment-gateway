@@ -56,6 +56,7 @@ async function processPayment(payment: PendingPayment, provider: ethers.JsonRpcP
         metadata: payment.metadata ?? null,
         receivedAmount: payment.receivedAmount?.toString() ?? null,
         expiresAt: payment.expiresAt.toISOString(),
+        createdAt: payment.createdAt.toISOString(),
       },
       'payment.expired'
     ).catch((error) => {
@@ -98,6 +99,7 @@ async function processPayment(payment: PendingPayment, provider: ethers.JsonRpcP
         metadata: payment.metadata ?? null,
         receivedAmount: balanceWei.toString(),
         expiresAt: payment.expiresAt?.toISOString() ?? null,
+        createdAt: payment.createdAt.toISOString(),
       };
 
       dispatchWebhooks(confirmedResult, 'payment.confirmed').catch((error) => {
@@ -145,6 +147,7 @@ async function processPayment(payment: PendingPayment, provider: ethers.JsonRpcP
             metadata: payment.metadata ?? null,
             receivedAmount: balanceWei.toString(),
             expiresAt: payment.expiresAt?.toISOString() ?? null,
+            createdAt: payment.createdAt.toISOString(),
           },
           'payment.underpaid'
         ).catch((error) => {
