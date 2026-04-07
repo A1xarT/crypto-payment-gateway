@@ -255,6 +255,12 @@ const DASHBOARD_HTML = `<!DOCTYPE html>
     .tab-content { display: none; }
     .tab-content.active { display: block; }
 
+    th.sortable { cursor: pointer; user-select: none; transition: color 0.1s; }
+    th.sortable:hover { color: #aaa; }
+    th.sortable::after { content: ' ↕'; font-size: 10px; color: #333; }
+    th.sort-asc::after { content: ' ↑'; font-size: 10px; color: #3b82f6; }
+    th.sort-desc::after { content: ' ↓'; font-size: 10px; color: #3b82f6; }
+
     .section-tabs { display: flex; gap: 0; margin-bottom: 24px; border-bottom: 1px solid #1e1e1e; }
     .section-tab { padding: 8px 18px; font-size: 13px; color: #666; cursor: pointer; border-bottom: 2px solid transparent; margin-bottom: -1px; }
     .section-tab.active { color: #fff; border-bottom-color: #3b82f6; }
@@ -489,9 +495,19 @@ const DASHBOARD_HTML = `<!DOCTYPE html>
       </div>
 
       <div class="tab-content active" id="admin-tab-users">
+        <div style="margin-bottom:14px">
+          <input type="text" id="admin-users-search" placeholder="Search by email or payout address…" oninput="onAdminUsersSearch()" style="max-width:360px;margin:0" />
+        </div>
         <div class="card">
           <table>
-            <thead><tr><th>Email</th><th>Payout Address</th><th>Role</th><th>Joined</th></tr></thead>
+            <thead id="admin-users-thead">
+              <tr>
+                <th class="sortable sort-desc" data-sort="email" onclick="sortAdminUsers('email')">Email</th>
+                <th>Payout Address</th>
+                <th class="sortable" data-sort="isAdmin" onclick="sortAdminUsers('isAdmin')">Role</th>
+                <th class="sortable" data-sort="createdAt" onclick="sortAdminUsers('createdAt')">Joined</th>
+              </tr>
+            </thead>
             <tbody id="admin-users-tbody"><tr><td colspan="4" class="empty">Loading…</td></tr></tbody>
           </table>
           <div class="pagination">
@@ -503,7 +519,8 @@ const DASHBOARD_HTML = `<!DOCTYPE html>
       </div>
 
       <div class="tab-content" id="admin-tab-payments">
-        <div style="display:flex;gap:10px;margin-bottom:16px">
+        <div style="display:flex;gap:10px;margin-bottom:14px;align-items:center;flex-wrap:wrap">
+          <input type="text" id="admin-payments-search" placeholder="Search by ID, merchant email or reference…" oninput="onAdminPaymentsSearch()" style="flex:1;min-width:260px;margin:0" />
           <select id="admin-filter-status" onchange="loadAdminPayments(1)" style="width:160px;margin:0">
             <option value="">All statuses</option>
             <option value="PENDING">Pending</option>
@@ -514,8 +531,18 @@ const DASHBOARD_HTML = `<!DOCTYPE html>
         </div>
         <div class="card">
           <table>
-            <thead><tr><th>Merchant</th><th>Amount</th><th>Status</th><th>Network</th><th>Created</th></tr></thead>
-            <tbody id="admin-payments-tbody"><tr><td colspan="5" class="empty">Loading…</td></tr></tbody>
+            <thead id="admin-payments-thead">
+              <tr>
+                <th class="sortable" data-sort="id" onclick="sortAdminPayments('id')">ID</th>
+                <th class="sortable" data-sort="merchant" onclick="sortAdminPayments('merchant')">Merchant</th>
+                <th class="sortable" data-sort="amount" onclick="sortAdminPayments('amount')">Amount</th>
+                <th class="sortable" data-sort="status" onclick="sortAdminPayments('status')">Status</th>
+                <th class="sortable" data-sort="network" onclick="sortAdminPayments('network')">Network</th>
+                <th class="sortable sort-desc" data-sort="createdAt" onclick="sortAdminPayments('createdAt')">Created</th>
+                <th class="sortable" data-sort="expiresAt" onclick="sortAdminPayments('expiresAt')">Expires</th>
+              </tr>
+            </thead>
+            <tbody id="admin-payments-tbody"><tr><td colspan="7" class="empty">Loading…</td></tr></tbody>
           </table>
           <div class="pagination">
             <button class="btn btn-ghost" id="admin-payments-prev" onclick="loadAdminPayments(currentAdminPaymentsPage - 1)">← Prev</button>
@@ -993,8 +1020,14 @@ const DASHBOARD_HTML = `<!DOCTYPE html>
 
   // ── Admin ─────────────────────────────────────────────────────────────────
 
-  let currentAdminUsersPage = 1;
+  let currentAdminUsersPage    = 1;
   let currentAdminPaymentsPage = 1;
+  let adminUsersSortBy         = 'createdAt';
+  let adminUsersSortOrder      = 'desc';
+  let adminPaymentsSortBy      = 'createdAt';
+  let adminPaymentsSortOrder   = 'desc';
+  let adminUsersSearchTimer    = null;
+  let adminPaymentsSearchTimer = null;
 
   function switchAdminTab(tab) {
     document.querySelectorAll('#tab-admin .tab-content').forEach(el => el.classList.remove('active'));
@@ -1006,9 +1039,56 @@ const DASHBOARD_HTML = `<!DOCTYPE html>
     if (tab === 'sweeps')   loadAdminFailedSweeps();
   }
 
+  function updateSortHeaders(theadId, sortBy, sortOrder) {
+    const thead = document.getElementById(theadId);
+    if (!thead) return;
+    thead.querySelectorAll('th[data-sort]').forEach(th => {
+      th.classList.remove('sort-asc', 'sort-desc');
+      if (th.dataset.sort === sortBy) {
+        th.classList.add(sortOrder === 'asc' ? 'sort-asc' : 'sort-desc');
+      }
+    });
+  }
+
+  function sortAdminUsers(col) {
+    if (adminUsersSortBy === col) {
+      adminUsersSortOrder = adminUsersSortOrder === 'asc' ? 'desc' : 'asc';
+    } else {
+      adminUsersSortBy    = col;
+      adminUsersSortOrder = 'desc';
+    }
+    updateSortHeaders('admin-users-thead', adminUsersSortBy, adminUsersSortOrder);
+    loadAdminUsers(1);
+  }
+
+  function sortAdminPayments(col) {
+    if (adminPaymentsSortBy === col) {
+      adminPaymentsSortOrder = adminPaymentsSortOrder === 'asc' ? 'desc' : 'asc';
+    } else {
+      adminPaymentsSortBy    = col;
+      adminPaymentsSortOrder = 'desc';
+    }
+    updateSortHeaders('admin-payments-thead', adminPaymentsSortBy, adminPaymentsSortOrder);
+    loadAdminPayments(1);
+  }
+
+  function onAdminUsersSearch() {
+    clearTimeout(adminUsersSearchTimer);
+    adminUsersSearchTimer = setTimeout(() => loadAdminUsers(1), 300);
+  }
+
+  function onAdminPaymentsSearch() {
+    clearTimeout(adminPaymentsSearchTimer);
+    adminPaymentsSearchTimer = setTimeout(() => loadAdminPayments(1), 300);
+  }
+
   async function loadAdminUsers(page) {
     currentAdminUsersPage = page;
-    const body  = await api('/admin/users?page=' + page + '&limit=20');
+    const search = document.getElementById('admin-users-search')?.value.trim() || '';
+    let url = '/admin/users?page=' + page + '&limit=20&sortBy=' + adminUsersSortBy + '&sortOrder=' + adminUsersSortOrder;
+    if (search) url += '&search=' + encodeURIComponent(search);
+
+    const body  = await api(url);
     const tbody = document.getElementById('admin-users-tbody');
 
     if (!body.success || !body.data.length) {
@@ -1038,14 +1118,16 @@ const DASHBOARD_HTML = `<!DOCTYPE html>
   async function loadAdminPayments(page) {
     currentAdminPaymentsPage = page;
     const status = document.getElementById('admin-filter-status')?.value || '';
-    let url = '/admin/payments?page=' + page + '&limit=20';
+    const search = document.getElementById('admin-payments-search')?.value.trim() || '';
+    let url = '/admin/payments?page=' + page + '&limit=20&sortBy=' + adminPaymentsSortBy + '&sortOrder=' + adminPaymentsSortOrder;
     if (status) url += '&status=' + status;
+    if (search) url += '&search=' + encodeURIComponent(search);
 
     const body  = await api(url);
     const tbody = document.getElementById('admin-payments-tbody');
 
     if (!body.success || !body.data.length) {
-      tbody.innerHTML = '<tr><td colspan="5" class="empty">No payments found</td></tr>';
+      tbody.innerHTML = '<tr><td colspan="7" class="empty">No payments found</td></tr>';
       document.getElementById('admin-payments-page-info').textContent = '';
       document.getElementById('admin-payments-prev').disabled = true;
       document.getElementById('admin-payments-next').disabled = true;
@@ -1054,11 +1136,13 @@ const DASHBOARD_HTML = `<!DOCTYPE html>
 
     tbody.innerHTML = body.data.map(p => \`
       <tr>
+        <td class="mono" style="font-size:11px" title="\${p.id}">\${p.id.slice(0, 8)}…</td>
         <td style="font-size:12px">\${p.merchantEmail}</td>
         <td>\${p.amount} ETH</td>
         <td><span class="badge badge-\${p.status.toLowerCase()}">\${p.status}</span></td>
         <td><span class="badge badge-\${p.network.toLowerCase()}">\${p.network}</span></td>
         <td>\${fmt(p.createdAt)}</td>
+        <td>\${p.expiresAt ? fmt(p.expiresAt) : '—'}</td>
       </tr>
     \`).join('');
 

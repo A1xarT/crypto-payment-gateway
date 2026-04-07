@@ -9,15 +9,30 @@ export const adminController = {
   async listUsers(request: Request, response: Response): Promise<void> {
     const page = Math.max(1, parseInt(String(request.query.page ?? '1'), 10) || 1);
     const limit = Math.min(100, Math.max(1, parseInt(String(request.query.limit ?? '20'), 10) || 20));
+    const search = String(request.query.search ?? '').trim();
+    const sortOrder: 'asc' | 'desc' = String(request.query.sortOrder) === 'asc' ? 'asc' : 'desc';
+    const VALID_USER_SORT = ['email', 'createdAt', 'isAdmin'] as const;
+    type UserSortField = typeof VALID_USER_SORT[number];
+    const sortBy: UserSortField = (VALID_USER_SORT as readonly string[]).includes(String(request.query.sortBy))
+      ? String(request.query.sortBy) as UserSortField
+      : 'createdAt';
+
+    const where = search
+      ? { OR: [
+          { email: { contains: search, mode: 'insensitive' as const } },
+          { payoutAddress: { contains: search, mode: 'insensitive' as const } },
+        ] }
+      : {};
 
     const [users, total] = await prisma.$transaction([
       prisma.user.findMany({
+        where,
         select: { id: true, email: true, payoutAddress: true, isAdmin: true, createdAt: true },
-        orderBy: { createdAt: 'desc' },
+        orderBy: { [sortBy]: sortOrder },
         skip: (page - 1) * limit,
         take: limit,
       }),
-      prisma.user.count(),
+      prisma.user.count({ where }),
     ]);
 
     response.json({
@@ -32,15 +47,35 @@ export const adminController = {
     const page = Math.max(1, parseInt(String(request.query.page ?? '1'), 10) || 1);
     const limit = Math.min(100, Math.max(1, parseInt(String(request.query.limit ?? '20'), 10) || 20));
     const statusFilter = String(request.query.status ?? '').toUpperCase();
+    const search = String(request.query.search ?? '').trim();
+    const sortOrder: 'asc' | 'desc' = String(request.query.sortOrder) === 'asc' ? 'asc' : 'desc';
+    const VALID_PAYMENT_SORT = ['id', 'amount', 'status', 'network', 'createdAt', 'expiresAt'] as const;
+    type PaymentSortField = typeof VALID_PAYMENT_SORT[number];
+    const sortByRaw = String(request.query.sortBy);
+    const isMerchantSort = sortByRaw === 'merchant';
+    const sortBy: PaymentSortField = (VALID_PAYMENT_SORT as readonly string[]).includes(sortByRaw)
+      ? sortByRaw as PaymentSortField
+      : 'createdAt';
 
     const where: Record<string, unknown> = {};
     if (statusFilter && VALID_STATUSES.includes(statusFilter)) where['status'] = statusFilter;
+    if (search) {
+      where['OR'] = [
+        { id: { contains: search, mode: 'insensitive' } },
+        { reference: { contains: search, mode: 'insensitive' } },
+        { user: { email: { contains: search, mode: 'insensitive' } } },
+      ];
+    }
+
+    const orderBy = isMerchantSort
+      ? { user: { email: sortOrder } }
+      : { [sortBy]: sortOrder };
 
     const [payments, total] = await prisma.$transaction([
       prisma.payment.findMany({
         where,
         include: { address: { select: { address: true } }, user: { select: { email: true } } },
-        orderBy: { createdAt: 'desc' },
+        orderBy,
         skip: (page - 1) * limit,
         take: limit,
       }),
@@ -60,6 +95,7 @@ export const adminController = {
       expiresAt: p.expiresAt?.toISOString() ?? null,
       createdAt: p.createdAt.toISOString(),
     }));
+
 
     response.json({
       success: true,
