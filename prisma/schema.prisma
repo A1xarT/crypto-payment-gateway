@@ -121,18 +121,19 @@ enum DeliveryStatus {
 }
 
 model Sweep {
-  id           String      @id @default(uuid())
-  paymentId    String      @unique @map("payment_id")
-  toAddress    String      @map("to_address")
-  txHash       String?     @map("tx_hash")
-  amountWei    String      @map("amount_wei")
-  gasCostWei   String      @map("gas_cost_wei")
-  status       SweepStatus @default(PENDING)
-  errorMessage String?     @map("error_message")
-  attemptCount Int         @default(0) @map("attempt_count")
-  confirmedAt  DateTime?   @map("confirmed_at")
-  createdAt    DateTime    @default(now()) @map("created_at")
-  payment      Payment     @relation(fields: [paymentId], references: [id])
+  id              String      @id @default(uuid())
+  paymentId       String      @unique @map("payment_id")
+  toAddress       String      @map("to_address")
+  txHash          String?     @map("tx_hash")
+  amountWei       String      @map("amount_wei")
+  gasCostWei      String      @map("gas_cost_wei")
+  platformFeeWei  String      @default("0") @map("platform_fee_wei")
+  status          SweepStatus @default(PENDING)
+  errorMessage    String?     @map("error_message")
+  attemptCount    Int         @default(0) @map("attempt_count")
+  confirmedAt     DateTime?   @map("confirmed_at")
+  createdAt       DateTime    @default(now()) @map("created_at")
+  payment         Payment     @relation(fields: [paymentId], references: [id])
 
   @@map("sweeps")
 }

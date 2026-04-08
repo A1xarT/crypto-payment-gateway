@@ -6,6 +6,7 @@ import { sweepTotal } from '../lib/metrics';
 import { logger } from '../lib/logger';
 
 const ETH_TRANSFER_GAS_LIMIT = 21_000n;
+const PLATFORM_FEE_BPS = 50n; // 0.5% = 50 basis points out of 10,000
 
 // How often the confirmation poller runs
 const CONFIRMATION_POLL_INTERVAL_MS = 60_000;
@@ -100,12 +101,16 @@ async function attemptSweep(
     return;
   }
 
+  const platformFeeWei = sweepAmountWei * PLATFORM_FEE_BPS / 10_000n;
+  const merchantAmountWei = sweepAmountWei - platformFeeWei;
+
   const sweep = await prisma.sweep.create({
     data: {
       paymentId,
       toAddress: payoutAddress,
-      amountWei: sweepAmountWei.toString(),
+      amountWei: merchantAmountWei.toString(),
       gasCostWei: gasCostWei.toString(),
+      platformFeeWei: platformFeeWei.toString(),
       status: 'PENDING',
       attemptCount: attemptNumber,
     },
@@ -117,7 +122,7 @@ async function attemptSweep(
 
     const tx = await depositWallet.sendTransaction({
       to: payoutAddress,
-      value: sweepAmountWei,
+      value: merchantAmountWei,
       gasLimit: ETH_TRANSFER_GAS_LIMIT,
       maxFeePerGas,
       maxPriorityFeePerGas: feeData.maxPriorityFeePerGas ?? maxFeePerGas,
@@ -129,8 +134,8 @@ async function attemptSweep(
     });
 
     sweepTotal.inc({ status: 'broadcast' });
-    logger.info({ paymentId, txHash: tx.hash, toAddress: payoutAddress, attempt: attemptNumber },
-      `[SweepService] Payment ${paymentId} sweep broadcast — ${ethers.formatEther(sweepAmountWei)} ETH → ${payoutAddress}`);
+    logger.info({ paymentId, txHash: tx.hash, toAddress: payoutAddress, attempt: attemptNumber, platformFeeWei: platformFeeWei.toString() },
+      `[SweepService] Payment ${paymentId} sweep broadcast — ${ethers.formatEther(merchantAmountWei)} ETH → ${payoutAddress} (fee: ${ethers.formatEther(platformFeeWei)} ETH)`);
 
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
